@@ -27,7 +27,7 @@ class SanityCheckTest(unittest.TestCase):
         bits = unquote(SanityCheckTest.RAVEN_RESPONSE).split("!")
         response = "!".join(bits[0:11])
 
-        binary_signature = b64decode(self.fixRavenBase64(bits[-1]))[0:128]
+        binary_signature = b64decode(self.fixRavenBase64(bits[-1]))
         self.assertEqual(128, len(binary_signature))
 
         response_hash = SHA.new(response)
@@ -36,7 +36,7 @@ class SanityCheckTest(unittest.TestCase):
         self.assertTrue(verifier.verify(response_hash, binary_signature))
 
     def fixRavenBase64(self, ravenb64):
-        return ravenb64.replace("-", "+").replace(".", "/").replace("_", "/")
+        return ravenb64.replace("-", "+").replace(".", "/").replace("_", "=")
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
