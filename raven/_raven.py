@@ -275,20 +275,17 @@ class Validator(object):
             response: The value of the WLS-Response query parameter provided
                 by the remote auth server (via the client's request), either as
                 a raw string, or as a AuthResponse object.
+            kwargs: any keyword args accepted by validate()
         Returns:
-            The username of the user whose login created the responsestr. The
-            return value is guaranteed to be a non empty string. In any case but
-            a successful login, a NotAuthenticatedException is raised instead of
-            returning a value.
-        Raises:
-            NotAuthenticatedException: If the reponse does not represent a validated
-                user login.
+            The username of the user whose login created the response if it 
+            represents a successful login. None is returned if the response was
+            invalid, or did not represent a successful login.
         """
         try:
             return (self.validate(response, **kwargs)
                     .get_authenticated_identity())
         except InvalidityException:
-            raise NotAuthenticatedException
+            return None
 
 
 class InvalidityException(ValueError):

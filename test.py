@@ -209,18 +209,14 @@ class ValidationTest(unittest.TestCase):
         self.assertEqual("hwtb2", validator.get_authenticated_user(
                 self.VALID_RAVEN_RESPONSE, now=datetime(2012, 5, 4, 22, 2, 58)))
 
-    def test_get_authenticated_user_raises_NotAuthenticatedException_on_manipulated_input(self):
+    def test_get_authenticated_user_returns_none_on_manipulated_input(self):
         keys = raven.RAVEN_KEYS
         validator = raven.Validator(keys)
         # Try to spoof the username of the response
         manipulated_response = self.VALID_RAVEN_RESPONSE.replace("hwtb2",
                                                                  "spoofuser")
-        try:
-            validator.get_authenticated_user(manipulated_response,
-                    now=datetime(2012, 5, 4, 22, 2, 58))
-            self.fail("An SignatureInvalidityException should have be raised")
-        except raven.NotAuthenticatedException:
-            pass
+        self.assertEqual(None, validator.get_authenticated_user(
+                manipulated_response, now=datetime(2012, 5, 4, 22, 2, 58)))
 
     def test_responses_older_than_one_min_are_invalid(self):
         keys = raven.RAVEN_KEYS
