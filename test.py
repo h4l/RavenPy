@@ -9,7 +9,6 @@ from urllib import unquote
 from datetime import datetime, timedelta
 
 import raven
-from raven._raven import InvalidityException
 
 class LoginUrlConstructionTest(unittest.TestCase):
 
@@ -188,7 +187,7 @@ class ValidationTest(unittest.TestCase):
             validator.validate(self.VALID_RAVEN_RESPONSE,
                     now=datetime(2012, 5, 4, 22, 2, 58))
             self.fail("URLs shouldn't match.")
-        except InvalidityException:
+        except raven.InvalidityException:
             pass
 
     def test_response_manipulation_invalidates_response(self):
