@@ -9,6 +9,7 @@ from urllib import unquote
 from datetime import datetime, timedelta
 
 import raven
+from raven._raven import InvalidityException
 
 class LoginUrlConstructionTest(unittest.TestCase):
 
@@ -43,8 +44,8 @@ class LoginUrlConstructionTest(unittest.TestCase):
         # when
         result = urlparse.urlparse(raven.login_url(post_login_url,
                 resource_name=resource_name,
-                acceptable_auth_types=acceptable_auth_types.split(","), message=message,
-                data=data))
+                acceptable_auth_types=acceptable_auth_types.split(","),
+                message=message, data=data))
         query_list = urlparse.parse_qsl(result.query)
         query = dict(query_list)
 
@@ -94,11 +95,6 @@ class LoginUrlConstructionTest(unittest.TestCase):
 
 class ValidationTest(unittest.TestCase):
 
-    RAVEN_PUB_KEY = RSA.importKey("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC/9qcA"
-            "W1XCSk0RfAfiulvTouMZKD4jm99rXtMIcO2bn+3ExQpObbwWugiO8DNEffS7bzSxZq"
-            "Gp7U6bPdi4xfX76wgWGQ6qWi55OXJV0oSiqrd3aOEspKmJKuupKXONo2efAt6JkdHV"
-            "H0O6O8k5LVap6w4y1W/T/ry4QH7khRxWtQ==")
-
     VALID_RAVEN_RESPONSE = ("1!200!!20120504T220258Z!1336168978-26673-6!https:/"
             "/textmonster.caret.cam.ac.uk/!hwtb2!pwd!!36000!foo%21bar%21baz!2!q"
             "-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewO"
@@ -123,11 +119,11 @@ class ValidationTest(unittest.TestCase):
 
         response_hash = SHA.new(response)
 
-        verifier = PKCS1_v1_5.new(self.RAVEN_PUB_KEY)
+        verifier = PKCS1_v1_5.new(raven.RAVEN_PUB_KEY_2)
         self.assertTrue(verifier.verify(response_hash, binary_signature))
 
     def test_parsed_response_contains_expected_data(self):
-        response = raven.AuthenticationResponse(self.VALID_RAVEN_RESPONSE)
+        response = raven.AuthResponse(self.VALID_RAVEN_RESPONSE)
         self.assertEqual("1", response.version)
         self.assertEqual(200, response.status)
         self.assertEqual("", response.status_description)
@@ -149,27 +145,87 @@ class ValidationTest(unittest.TestCase):
         self.assertEqual(128, len(response.signature))
 
     def test_valid_response_validates(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys)
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
         validator.validate(self.VALID_RAVEN_RESPONSE,
                            now=datetime(2012, 5, 4, 22, 2, 58))
 
+    def test_valid_response_validates_with_url_check(self):
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys,
+                expected_post_login_url="https://textmonster.caret.cam.ac.uk/")
+        validator.validate(self.VALID_RAVEN_RESPONSE,
+                           now=datetime(2012, 5, 4, 22, 2, 58))
+
+    def test_valid_response_validates_with_url_check2(self):
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys,
+                expected_post_login_url=("https", "textmonster.caret.cam.ac.uk",
+                        "/", "", "", ""))
+        validator.validate(self.VALID_RAVEN_RESPONSE,
+                           now=datetime(2012, 5, 4, 22, 2, 58))
+
+    def test_validator_ctor_fails_if_url_param_is_tuple_but_not_len_6(self):
+        try:
+            raven.Validator({},
+                    expected_post_login_url=("", "", "", "", "", "", ""))
+            self.fail("A ValueError should have been raised.")
+        except ValueError:
+            pass
+        try:
+            raven.Validator({},
+                    expected_post_login_url=("", "", "", "", ""))
+            self.fail("A ValueError should have been raised.")
+        except ValueError:
+            pass
+
+    def test_valid_response_with_bad_url_invalidates_response(self):
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys,
+                expected_post_login_url=("https", "someotherhostname.com",
+                        "/", "", "", ""))
+        try:
+            validator.validate(self.VALID_RAVEN_RESPONSE,
+                    now=datetime(2012, 5, 4, 22, 2, 58))
+            self.fail("URLs shouldn't match.")
+        except InvalidityException:
+            pass
+
     def test_response_manipulation_invalidates_response(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys)
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
         # Try to spoof the username of the response
         manipulated_response = self.VALID_RAVEN_RESPONSE.replace("hwtb2",
                                                                  "spoofuser")
         try:
             validator.validate(manipulated_response,
-                           now=datetime(2012, 5, 4, 22, 2, 58))
+                    now=datetime(2012, 5, 4, 22, 2, 58))
             self.fail("An SignatureInvalidityException should have be raised")
         except raven.SignatureInvalidityException:
             pass
 
+    def test_get_authenticated_user_returns_valid_user_for_valid_response(self):
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
+        self.assertEqual("hwtb2", validator.get_authenticated_user(
+                self.VALID_RAVEN_RESPONSE, now=datetime(2012, 5, 4, 22, 2, 58)))
+
+    def test_get_authenticated_user_raises_NotAuthenticatedException_on_manipulated_input(self):
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
+        # Try to spoof the username of the response
+        manipulated_response = self.VALID_RAVEN_RESPONSE.replace("hwtb2",
+                                                                 "spoofuser")
+        try:
+            validator.get_authenticated_user(manipulated_response,
+                    now=datetime(2012, 5, 4, 22, 2, 58))
+            self.fail("An SignatureInvalidityException should have be raised")
+        except raven.NotAuthenticatedException:
+            pass
+
     def test_responses_older_than_one_min_are_invalid(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys)
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
 
         # Set now to be the auth time plus just over 1 min
         now = datetime(2012, 5, 4, 22, 2, 58) + timedelta(seconds=61)
@@ -180,8 +236,8 @@ class ValidationTest(unittest.TestCase):
             pass
 
     def test_responses_newer_than_one_min_are_invalid(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys)
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys)
 
         # Set now to be the auth time minus just over 1 min
         now = datetime(2012, 5, 4, 22, 2, 58) - timedelta(seconds=61)
@@ -192,8 +248,8 @@ class ValidationTest(unittest.TestCase):
             pass
 
     def test_responses_referencing_missing_keys_are_invalid(self):
-        keys = {"responseDoesn'tKnowAboutThisKey": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys)
+        keys = {"responseDoesn'tKnowAboutThisKey": raven.RAVEN_PUB_KEY_2}
+        validator = raven.Validator(keys)
         now = datetime(2012, 5, 4, 22, 2, 58)
         try:
             validator.validate(self.VALID_RAVEN_RESPONSE, now=now)
@@ -202,8 +258,8 @@ class ValidationTest(unittest.TestCase):
             pass
 
     def test_responses_with_unacceptable_auth_types_are_invalid(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys,
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys,
                 acceptable_auth_types=["foo"])
         now = datetime(2012, 5, 4, 22, 2, 58)
         try:
@@ -214,8 +270,8 @@ class ValidationTest(unittest.TestCase):
             pass
 
     def test_responses_with_unacceptable_origional_auth_types_are_invalid(self):
-        keys = {"2": self.RAVEN_PUB_KEY}
-        validator = raven.AuthenticationResponseValidator(keys,
+        keys = raven.RAVEN_KEYS
+        validator = raven.Validator(keys,
                 acceptable_auth_types=["foo", "bar"])
         now = datetime(2012, 5, 4, 22, 2, 58)
         response = "1!200!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!hwtb2!!foo,bar,baz!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_"
@@ -228,27 +284,35 @@ class ValidationTest(unittest.TestCase):
     def test_too_many_values_invalidates_response(self):
         response = self.VALID_RAVEN_RESPONSE + "!foo"
         try:
-            raven.AuthenticationResponse(response)
+            raven.AuthResponse(response)
             self.fail("An InvalidityException should have be raised")
         except raven.InvalidityException:
             pass
 
     def test_too_few_values_invalidates_response(self):
         try:
-            raven.AuthenticationResponse("wee!pop!ping")
+            raven.AuthResponse("wee!pop!ping")
             self.fail("An InvalidityException should have be raised")
         except raven.InvalidityException:
             pass
 
+    def test_response_with_non_200_status_has_no_authenticated_entity(self):
+        response = raven.AuthResponse("1!500!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
+        try:
+            response.get_authenticated_identity()
+            self.fail("An InvalidityException should have be raised")
+        except raven.NotAuthenticatedException:
+            pass
+
     def expect_invalid_response(self, response):
         try:
-            raven.AuthenticationResponse(response)
+            raven.AuthResponse(response)
             self.fail("An InvalidityException should have be raised")
         except raven.InvalidityException:
             pass
 
     def expect_valid_response(self, response):
-        raven.AuthenticationResponse(response)
+        raven.AuthResponse(response)
 
     def test_missing_version_invalidates_response(self):
         self.expect_invalid_response("!200!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!hwtb2!pwd!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
@@ -297,11 +361,8 @@ class ValidationTest(unittest.TestCase):
         self.expect_valid_response("1!410!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
 
     def test_successful_response_with_no_lifetime_has_no_expiry(self):
-        response = raven.AuthenticationResponse("1!200!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!hwtb2!pwd!!!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
+        response = raven.AuthResponse("1!200!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!hwtb2!pwd!!!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
         self.assertEqual(None, response.expiry_timestamp)
-
-    def XXX(self):
-        self.expect_invalid_response("1!200!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!hwtb2!pwd!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
 
 if __name__ == "__main__":
     unittest.main()
