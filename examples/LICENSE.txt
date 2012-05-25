@@ -1,0 +1,4 @@
+The examples in this examples/ directory should be considered to be in the
+public domain. If that doesn't work for you for some reason, you may instead
+use the examples under the terms of the MIT license as found in MIT-LICENSE.txt
+at the root of this repository.
