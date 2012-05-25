@@ -70,10 +70,13 @@ RAVEN_PUB_KEY_2 = RSA.importKey("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC/9qcAW1"
 
 RAVEN_KEYS = {"2": RAVEN_PUB_KEY_2}
 
+RAVEN_URL = "https://raven.cam.ac.uk/auth/authenticate.html"
+DEFAULT_AUTH_TYPES = ["pwd"]
+
 def login_url(post_login_url,
-        authservice_url="https://raven.cam.ac.uk/auth/authenticate.html",
-        resource_name=None, acceptable_auth_types=["pwd"], message=None,
-        reauthenticate=None, data=None):
+        authservice_url=RAVEN_URL,
+        resource_name=None, acceptable_auth_types=DEFAULT_AUTH_TYPES,
+        message=None, reauthenticate=None, data=None):
     """Constructs a login URL for a Ucam-webauth auth service.
     
     Args:
