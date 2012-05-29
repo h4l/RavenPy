@@ -3,3 +3,6 @@
 *.swp
 .project
 .pydevproject
+*.db
+htmlcov/
+.coverage
