@@ -22,7 +22,7 @@ from django.contrib.auth import backends
 from django.contrib.auth.models import User
 from django.utils.crypto import constant_time_compare
 import raven
-from raven.django_raven_auth import settings
+from raven.raven_django import settings
 
 class RavenBackend(backends.ModelBackend):
     """A Django Authentication backend which uses Raven auth responses to

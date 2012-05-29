@@ -2,11 +2,11 @@
 
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
-    'raven.django_raven_auth.backends.RavenBackend'
+    'raven.raven_django.backends.RavenBackend'
 )
 
 INSTALLED_APPS = [
-    'raven.django_raven_auth'
+    'raven.raven_django'
 ]
 
 RAVEN_RESOURCE_NAME = "Raven Django Example"

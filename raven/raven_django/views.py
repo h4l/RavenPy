@@ -25,7 +25,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.utils.crypto import salted_hmac
 from django.views.decorators.http import require_GET
-from raven.django_raven_auth import settings
+from raven.raven_django import settings
 import raven
 import urlparse
 import urllib

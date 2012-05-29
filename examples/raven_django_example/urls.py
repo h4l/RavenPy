@@ -8,6 +8,6 @@ urlpatterns = patterns('',
     url(r'^$', 'raven_django_example.app.views.home', name='home'),
     url(r'^private/$', 'raven_django_example.app.views.private', name='private'),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^accounts/login/', 'raven.django_raven_auth.views.raven_login'),
+    url(r'^accounts/login/', 'raven.raven_django.views.raven_login'),
 
 )
