@@ -134,6 +134,13 @@ class ValidationTest(unittest.TestCase):
             "XuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3"
             "aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
 
+    LOGIN_CANCELLED_RAVEN_RESPONSE = ("1!410!!20120601T154909Z!1338565749-4905-"
+            "24!http://localhost:8000/accounts/login/?next=%252Fprivate%252F!!!"
+            "!!ad0c2edf57421f367298cb9c239d6a0634d2dfac!2!vp3xhlndukhNsUnW7-fuO"
+            "l9j-zmw0hCttX.ZtDDxI.-rEredJdddbF7aoHYhXzvlciwMx2mBIyUhAU1PewHlIhM"
+            "PmOppBT1pwB5XPzvumAIyriAH6QO63J5uJDoFMTK26c9ZIzoXjxYhEdnrU28zaU7Yj"
+            "fNhmdz-xV.wRVpf3-Y_")
+
     @staticmethod
     def unescape_signature(sig):
         return b64decode(sig.replace("-", "+").replace(".", "/")
@@ -333,6 +340,17 @@ class ValidationTest(unittest.TestCase):
         except raven.NotAuthenticatedException:
             pass
 
+    def test_cancelled_login_response_has_no_authenticated_entity(self):
+        validator = raven.Validator(raven.RAVEN_KEYS)
+        response_str = self.LOGIN_CANCELLED_RAVEN_RESPONSE
+        now = datetime(2012, 6, 1, 15, 49, 9)
+        response = validator.validate(response_str, now=now)
+        self.assertFalse(response.represents_successful_authentication())
+        try:
+            response.get_authenticated_identity()
+        except raven.NotAuthenticatedException:
+            pass
+
     def expect_invalid_response(self, response):
         try:
             raven.AuthResponse(response)
@@ -387,6 +405,8 @@ class ValidationTest(unittest.TestCase):
 
     def test_origional_auth_types_and_auth_type_cant_be_present_on_failure(self):
         self.expect_invalid_response("1!410!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!pwd!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
+        self.expect_invalid_response("1!410!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!pwd!pwd!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
+        self.expect_invalid_response("1!410!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!!pwd!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
         self.expect_valid_response("1!410!!20120504T220258Z!1336168978-26673-6!https://textmonster.caret.cam.ac.uk/!!!!36000!foo%21bar%21baz!2!q-VLPI3tE3Qrxe6Or6dxNs8jBnCN8iYzdTYSPuc9LbzjQay9JpTU59Xpl37dg5AaewOXuxmrjTngPGp.qmNtmdcKzV8cLL6I4cane23QwQJt0vvLcTZc1n.fyYd.qBTjUjHs3aa-8eLc5kdWwNDTHN6N0On.A9sDwv6kGqsZJYA_")
 
     def test_successful_response_with_no_lifetime_has_no_expiry(self):

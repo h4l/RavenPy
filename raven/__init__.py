@@ -239,6 +239,10 @@ class Validator(object):
                     "Response signature was not valid", response)
 
     def _validate_authtypes(self, response):
+        # auth types are only applicable to successful auth responses
+        if not response.represents_successful_authentication():
+            return
+
         if response.auth_type:
             if response.auth_type not in self._acceptable_auth_types:
                 raise InvalidityException("Response was authenticated with "
@@ -246,6 +250,8 @@ class Validator(object):
                         .format(response.auth_type,
                             self._acceptable_auth_types))
         else:
+            # AuthResponse._validate() ensures that at least one of auth_type, 
+            # origional_auth_types are present on successful auths.
             assert response.origional_auth_types
             previous_types = set(response.origional_auth_types)
             # Fail if any auth types used to validate previously are not 
@@ -459,6 +465,9 @@ class AuthResponse(object):
             if self.auth_type:
                 raise InvalidityException(
                         "auth_type WAS present with non 200 status")
+            if self.origional_auth_types:
+                raise InvalidityException(
+                        "origional_auth_types WAS present with non 200 status")
         if self.signature and not self.key_id:
             raise InvalidityException(
                     "no key_id present with signature present")
