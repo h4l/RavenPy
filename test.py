@@ -20,13 +20,10 @@
 # SOFTWARE.
 import unittest
 import urlparse
-from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
 from HTMLParser import HTMLParser
-
 from base64 import b64decode
-from urllib import unquote
 from datetime import datetime, timedelta
 
 # Import _raven directly to access all hidden members
