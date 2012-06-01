@@ -23,12 +23,14 @@ import urlparse
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 from Crypto.Hash import SHA
+from HTMLParser import HTMLParser
 
 from base64 import b64decode
 from urllib import unquote
 from datetime import datetime, timedelta
 
-import raven
+# Import _raven directly to access all hidden members
+import raven._raven as raven
 
 class LoginUrlConstructionTest(unittest.TestCase):
 
@@ -51,6 +53,23 @@ class LoginUrlConstructionTest(unittest.TestCase):
         result = urlparse.urlparse(result_url)
         self.assertEqual(auth_url, self.replace(result, 4, ""),
                          "Input and output urls are the same (ignoring query)")
+
+    def test_html_escape(self):
+        # Some strings containing various odd unicode characters
+        odd_strings = [
+            u"This is a test of a fancy login message with odd characters such "
+            u"as: \u03a9 \u2248 \xe7 \u2211 \u02da \u2206 \u03c0 \xf8 .",
+            "foo",
+            u"\xe6\xdf\xe5\u2202\u0192\u221a^\xb4\xa9\u0192\u02d9\u2206\u02da"
+            u"\xdf\u2202\u0192\xdf\xac\u2202\xe7~\u222b\u221a~\xb5\u2248\xa8^"
+            u"\xf8\u2211\xb4\xa9\u02d9\xdf\u2206"
+        ]
+
+        for strange_string in odd_strings:
+            escaped = raven._html_escape(strange_string)
+            # Check that the input string equals the unescaped version of the 
+            # escaped string.
+            self.assertEqual(strange_string, HTMLParser().unescape(escaped))
 
     def test_provided_params_end_where_expected(self):
         # given

@@ -1,4 +1,3 @@
-- Escape desc and msg fields before sending them to Raven.
 - Add explicit error views to raven.django_raven_auth
 - Tests for raven.raven_django (raven module itself has 100% coverage)
 - Generate documentation from comments (and write more)

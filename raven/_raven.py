@@ -139,9 +139,9 @@ def login_url(post_login_url,
 
     # Optional parameters
     if resource_name:
-        url_params.append(("desc", resource_name))
+        url_params.append(("desc", _html_escape(resource_name)))
     if message:
-        url_params.append(("msg", message))
+        url_params.append(("msg", _html_escape(message)))
     if acceptable_auth_types and len(acceptable_auth_types) > 0:
         url_params.append(("aauth", ",".join(acceptable_auth_types)))
     if reauthenticate:
@@ -155,6 +155,24 @@ def login_url(post_login_url,
 
     return urlparse.urlunparse(
             _replace_query(auth_url, urllib.urlencode(url_params)))
+
+def _html_escape(string):
+    """HTML escapes non ASCII printable chars in string.
+    
+    Values outside the range [0x20, 0x7e] are replaced by the string "&#x___;"
+    where ___ is the hexidecimal encoding of unicode codepoint of the
+    character.
+    
+    Args:
+        string: A python string. This should be a unicode object if chars with
+            codepoints outside the ascii range are used. 
+    """
+    if not string:
+        return string
+    head, tail = string[0], string[1:]
+    if ord(head) < 0x20 or ord(head) > 0x7e or head == "&":
+        head = "&#" + hex(ord(head))[1:] + ";"
+    return head + _html_escape(tail)
 
 def _replace_query(parsed_url, querystring):
     pieces = list(parsed_url)
