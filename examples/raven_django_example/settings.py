@@ -138,3 +138,26 @@ INSTALLED_APPS += [
     # 'django.contrib.admindocs',
     'raven_django_example.app'
 ]
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': True,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(name)s %(message)s'
+        },
+    },
+    'handlers': {
+        'console':{
+            'level':'DEBUG',
+            'class':'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'raven': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        }
+    }
+}

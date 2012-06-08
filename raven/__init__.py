@@ -82,6 +82,7 @@ from Crypto.Hash import SHA
 import datetime
 import urllib
 import urlparse
+import logging
 
 RAVEN_PUB_KEY_2 = RSA.importKey("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAgQC/9qcAW1"
         "XCSk0RfAfiulvTouMZKD4jm99rXtMIcO2bn+3ExQpObbwWugiO8DNEffS7bzSxZqGp7U6b"
@@ -92,6 +93,8 @@ RAVEN_KEYS = {"2": RAVEN_PUB_KEY_2}
 
 RAVEN_URL = "https://raven.cam.ac.uk/auth/authenticate.html"
 DEFAULT_AUTH_TYPES = ["pwd"]
+
+LOG = logging.getLogger(__name__)
 
 def login_url(post_login_url,
         authservice_url=RAVEN_URL,
@@ -336,12 +339,13 @@ class Validator(object):
 
 
 class InvalidityException(ValueError):
-    pass
+    def __init__(self, message):
+        LOG.info("Invalid response: %s" % message)
+        ValueError.__init__(self, message)
 
 
 class SignatureInvalidityException(InvalidityException):
     pass
-
 
 class NotAuthenticatedException(Exception):
     pass

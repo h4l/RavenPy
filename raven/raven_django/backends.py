@@ -23,6 +23,9 @@ from django.contrib.auth.models import User
 from django.utils.crypto import constant_time_compare
 import raven
 from raven.raven_django import settings
+import logging
+
+LOG = logging.getLogger(__name__)
 
 class RavenBackend(backends.ModelBackend):
     """A Django Authentication backend which uses Raven auth responses to
@@ -63,6 +66,7 @@ class RavenBackend(backends.ModelBackend):
         # If no raven_response is set then this authenticate() call must not
         # be meant for us
         if raven_response is None:
+            LOG.debug("authenticate() called without raven_response - ignoring")
             return False
         if expected_data is None:
             raise ValueError("No expected_data value provided.")
@@ -71,7 +75,13 @@ class RavenBackend(backends.ModelBackend):
         try:
             authresponse = validator.validate(raven_response)
             username = authresponse.get_authenticated_identity()
-        except (raven.NotAuthenticatedException, raven.InvalidityException):
+        except raven.NotAuthenticatedException:
+            LOG.warn("Authentication rejected: "
+                    "response was valid but did not have success status")
+            return None
+        except raven.InvalidityException:
+            LOG.warn("Authentication rejected: "
+                    "response was invalid in some way")
             return None
 
         # Ensure response data matches expected_data. In order not to leak 
@@ -79,7 +89,13 @@ class RavenBackend(backends.ModelBackend):
         # used which takes the same time to determine string equality, 
         # regardless of how much of a string matched.
         if not constant_time_compare(expected_data, authresponse.request_data):
+            LOG.warn("Got valid raven response, but the response's data did not"
+                    " match the user's per-session secret. This could indicate "
+                    "a login CSRF attempt. expected: %s but got: %s" % (
+                            expected_data, authresponse.request_data))
             return None
 
         user, _ = User.objects.get_or_create(username=username)
+        LOG.info("Authentication successful. user: %s, raven_response: %s" % (
+                user.username, raven_response))
         return user
